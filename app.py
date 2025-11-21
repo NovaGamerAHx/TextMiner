@@ -110,7 +110,7 @@ def search():
         pipeline = [
             {
                 "$vectorSearch": {
-                    "index": "default",        # نام ایندکس (پیش‌فرض default است)
+                    "index": "vector_index",        # نام ایندکس (پیش‌فرض default است)
                     "path": "embedding",
                     "queryVector": query_embedding,
                     "numCandidates": 100,
@@ -136,3 +136,4 @@ def search():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
