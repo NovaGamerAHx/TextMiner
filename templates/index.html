@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TextMiner | جستجوی هوشمند در متن</title>
+    <style>
+        :root { --primary: #4f46e5; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        
+        .container { width: 100%; max-width: 800px; background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        
+        h1 { text-align: center; color: var(--primary); margin-bottom: 10px; }
+        p.subtitle { text-align: center; color: #6b7280; margin-bottom: 30px; font-size: 0.9rem; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.95rem; }
+        
+        input[type="text"], input[type="file"] { width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-family: inherit; box-sizing: border-box; transition: 0.3s; }
+        input[type="text"]:focus { border-color: var(--primary); outline: none; }
+        
+        button { width: 100%; background-color: var(--primary); color: white; padding: 14px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        button:hover { background-color: #4338ca; }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        
+        /* بخش نتایج */
+        #results-area { margin-top: 30px; display: none; }
+        .result-card { background: #f9fafb; border-right: 4px solid var(--primary); padding: 15px; margin-bottom: 15px; border-radius: 6px; line-height: 1.6; font-size: 0.95rem; text-align: justify; }
+        .result-badge { font-size: 0.8rem; color: #6b7280; margin-bottom: 5px; display: block; }
+        
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>💎 TextMiner</h1>
+    <p class="subtitle">فایل متنی خود را آپلود کنید و سوال بپرسید. ما مرتبط‌ترین بخش‌ها را پیدا می‌کنیم.</p>
+    
+    <div class="form-group">
+        <label for="file-input">۱. انتخاب فایل متنی (.txt)</label>
+        <input type="file" id="file-input" accept=".txt">
+    </div>
+    
+    <div class="form-group">
+        <label for="prompt-input">۲. سوال یا عبارت مورد جستجو</label>
+        <input type="text" id="prompt-input" placeholder="مثلا: نظر نویسنده در مورد هوش مصنوعی چیست؟">
+    </div>
+
+    <button id="submit-btn" onclick="analyzeText()">
+        <span id="btn-text">جستجو و تحلیل</span>
+        <div class="loader" id="loader"></div>
+    </button>
+
+    <div id="results-area">
+        <h3>🔍 نتایج یافت شده (۵ مورد برتر):</h3>
+        <div id="chunks-container"></div>
+    </div>
+</div>
+
+<script>
+    async function analyzeText() {
+        const fileInput = document.getElementById('file-input');
+        const promptInput = document.getElementById('prompt-input');
+        const file = fileInput.files[0];
+        const prompt = promptInput.value;
+
+        if (!file || !prompt) {
+            alert("لطفا هم فایل را انتخاب کنید و هم سوال را بنویسید.");
+            return;
+        }
+
+        // UI Loading State
+        const btn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+        const loader = document.getElementById('loader');
+        
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        loader.style.display = 'block';
+        document.getElementById('results-area').style.display = 'none';
+
+        // Prepare Data
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('prompt', prompt);
+
+        try {
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                alert("خطا: " + data.error);
+            } else {
+                displayResults(data.results);
+            }
+
+        } catch (error) {
+            alert("خطا در برقراری ارتباط با سرور");
+            console.error(error);
+        } finally {
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            loader.style.display = 'none';
+        }
+    }
+
+    function displayResults(chunks) {
+        const container = document.getElementById('chunks-container');
+        container.innerHTML = '';
+
+        chunks.forEach((chunk, index) => {
+            const div = document.createElement('div');
+            div.className = 'result-card';
+            div.innerHTML = `
+                <span class="result-badge">رتبه مرتبط بودن: #${index + 1}</span>
+                ${chunk.replace(/\n/g, '<br>')}
+            `;
+            container.appendChild(div);
+        });
+
+        document.getElementById('results-area').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
