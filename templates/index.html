@@ -3,130 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TextMiner | جستجوی هوشمند در متن</title>
+    <title>سیستم RAG ابری</title>
     <style>
-        :root { --primary: #4f46e5; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        
-        .container { width: 100%; max-width: 800px; background: var(--card); padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        
-        h1 { text-align: center; color: var(--primary); margin-bottom: 10px; }
-        p.subtitle { text-align: center; color: #6b7280; margin-bottom: 30px; font-size: 0.9rem; }
-        
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.95rem; }
-        
-        input[type="text"], input[type="file"] { width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-family: inherit; box-sizing: border-box; transition: 0.3s; }
-        input[type="text"]:focus { border-color: var(--primary); outline: none; }
-        
-        button { width: 100%; background-color: var(--primary); color: white; padding: 14px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button:hover { background-color: #4338ca; }
-        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
-        
-        /* بخش نتایج */
-        #results-area { margin-top: 30px; display: none; }
-        .result-card { background: #f9fafb; border-right: 4px solid var(--primary); padding: 15px; margin-bottom: 15px; border-radius: 6px; line-height: 1.6; font-size: 0.95rem; text-align: justify; }
-        .result-badge { font-size: 0.8rem; color: #6b7280; margin-bottom: 5px; display: block; }
-        
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { font-family: Tahoma, sans-serif; background: #f4f4f9; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #333; }
+        input, button { width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ddd; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        button.secondary { background: #007bff; }
+        button.secondary:hover { background: #0056b3; }
+        #status-msg { margin-top: 10px; color: #555; font-size: 0.9em; }
+        .result-item { background: #e9ecef; padding: 10px; margin-top: 10px; border-radius: 5px; border-right: 4px solid #007bff; }
+        .score { font-size: 0.8em; color: #666; float: left; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>💎 TextMiner</h1>
-    <p class="subtitle">فایل متنی خود را آپلود کنید و سوال بپرسید. ما مرتبط‌ترین بخش‌ها را پیدا می‌کنیم.</p>
-    
-    <div class="form-group">
-        <label for="file-input">۱. انتخاب فایل متنی (.txt)</label>
-        <input type="file" id="file-input" accept=".txt">
-    </div>
-    
-    <div class="form-group">
-        <label for="prompt-input">۲. سوال یا عبارت مورد جستجو</label>
-        <input type="text" id="prompt-input" placeholder="مثلا: نظر نویسنده در مورد هوش مصنوعی چیست؟">
+    <!-- بخش آپلود -->
+    <div class="card">
+        <h2>📤 ۱. افزودن دانش به سیستم</h2>
+        <p>فایل متنی خود را آپلود کنید تا در پایگاه داده ابری ذخیره شود.</p>
+        <input type="file" id="fileInput" accept=".txt">
+        <button onclick="uploadFile()">آپلود و پردازش</button>
+        <div id="status-msg"></div>
     </div>
 
-    <button id="submit-btn" onclick="analyzeText()">
-        <span id="btn-text">جستجو و تحلیل</span>
-        <div class="loader" id="loader"></div>
-    </button>
-
-    <div id="results-area">
-        <h3>🔍 نتایج یافت شده (۵ مورد برتر):</h3>
-        <div id="chunks-container"></div>
+    <!-- بخش جستجو -->
+    <div class="card">
+        <h2>🔍 ۲. جستجو در دانش</h2>
+        <input type="text" id="queryInput" placeholder="سوال خود را بپرسید...">
+        <button class="secondary" onclick="search()">جستجو</button>
+        <div id="results"></div>
     </div>
-</div>
 
-<script>
-    async function analyzeText() {
-        const fileInput = document.getElementById('file-input');
-        const promptInput = document.getElementById('prompt-input');
-        const file = fileInput.files[0];
-        const prompt = promptInput.value;
+    <script>
+        async function uploadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return alert("لطفا فایل انتخاب کنید");
 
-        if (!file || !prompt) {
-            alert("لطفا هم فایل را انتخاب کنید و هم سوال را بنویسید.");
-            return;
-        }
-
-        // UI Loading State
-        const btn = document.getElementById('submit-btn');
-        const btnText = document.getElementById('btn-text');
-        const loader = document.getElementById('loader');
-        
-        btn.disabled = true;
-        btnText.style.display = 'none';
-        loader.style.display = 'block';
-        document.getElementById('results-area').style.display = 'none';
-
-        // Prepare Data
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('prompt', prompt);
-
-        try {
-            const response = await fetch('/analyze', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-                alert("خطا: " + data.error);
-            } else {
-                displayResults(data.results);
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            document.getElementById('status-msg').innerText = "⏳ در حال آپلود و ساخت وکتور...";
+            
+            try {
+                // نکته مهم: اینجا به آدرس جدید درخواست میفرستد
+                const res = await fetch('/upload_and_process', { method: 'POST', body: formData });
+                if (res.status === 404) {
+                     alert("خطای 404: آدرس پیدا نشد. لطفا مطمئن شوید کد پایتون جدید دیپلوی شده است.");
+                     return;
+                }
+                const data = await res.json();
+                if (data.error) alert(data.error);
+                else document.getElementById('status-msg').innerText = "✅ " + data.message;
+            } catch (e) { 
+                console.error(e);
+                alert("خطا در ارتباط با سرور"); 
             }
-
-        } catch (error) {
-            alert("خطا در برقراری ارتباط با سرور");
-            console.error(error);
-        } finally {
-            btn.disabled = false;
-            btnText.style.display = 'inline';
-            loader.style.display = 'none';
         }
-    }
 
-    function displayResults(chunks) {
-        const container = document.getElementById('chunks-container');
-        container.innerHTML = '';
+        async function search() {
+            const query = document.getElementById('queryInput').value;
+            if (!query) return alert("سوال را وارد کنید");
+            
+            document.getElementById('results').innerHTML = "⏳ در حال جستجو...";
 
-        chunks.forEach((chunk, index) => {
-            const div = document.createElement('div');
-            div.className = 'result-card';
-            div.innerHTML = `
-                <span class="result-badge">رتبه مرتبط بودن: #${index + 1}</span>
-                ${chunk.replace(/\n/g, '<br>')}
-            `;
-            container.appendChild(div);
-        });
+            try {
+                // نکته مهم: اینجا به آدرس جدید جستجو درخواست میفرستد
+                const res = await fetch('/search', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ query: query }) 
+                });
+                const data = await res.json();
+                
+                const container = document.getElementById('results');
+                container.innerHTML = "";
+                
+                if (!data.results || data.results.length === 0) {
+                    container.innerHTML = "<p>موردی یافت نشد.</p>";
+                    return;
+                }
 
-        document.getElementById('results-area').style.display = 'block';
-    }
-</script>
+                data.results.forEach(item => {
+                    container.innerHTML += `
+                        <div class="result-item">
+                            <span class="score">امتیاز: ${item.score ? item.score.toFixed(4) : 'N/A'}</span>
+                            <p>${item.text}</p>
+                            <small style="color:#888">منبع: ${item.source_file}</small>
+                        </div>
+                    `;
+                });
+
+            } catch (e) { 
+                console.error(e);
+                alert("خطا در جستجو"); 
+            }
+        }
+    </script>
 
 </body>
 </html>
