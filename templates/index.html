@@ -3,105 +3,287 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سیستم RAG ابری</title>
+    <title>AI Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: Tahoma, sans-serif; background: #f4f4f9; padding: 20px; max-width: 800px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { margin-top: 0; color: #333; }
-        input, button { width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ddd; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #218838; }
-        button.secondary { background: #007bff; }
-        button.secondary:hover { background: #0056b3; }
-        #status-msg { margin-top: 10px; color: #555; font-size: 0.9em; }
-        .result-item { background: #e9ecef; padding: 10px; margin-top: 10px; border-radius: 5px; border-right: 4px solid #007bff; }
-        .score { font-size: 0.8em; color: #666; float: left; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #343541; color: white; }
+        .sidebar { background-color: #202123; }
+        .chat-area { background-color: #343541; }
+        .msg-user { background-color: #343541; }
+        .msg-ai { background-color: #444654; }
+        .input-area { background-color: #40414f; box-shadow: 0 0 15px rgba(0,0,0,0.2); }
+        /* Markdown Styles */
+        .prose pre { background: #2d2d2d; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .prose code { background: #3e3e3e; padding: 2px 5px; border-radius: 3px; }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #3498db; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #202123; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
     </style>
 </head>
-<body>
+<body class="h-screen flex flex-col md:flex-row overflow-hidden">
 
-    <!-- بخش آپلود -->
-    <div class="card">
-        <h2>📤 ۱. افزودن دانش به سیستم</h2>
-        <p>فایل متنی خود را آپلود کنید تا در پایگاه داده ابری ذخیره شود.</p>
-        <input type="file" id="fileInput" accept=".txt">
-        <button onclick="uploadFile()">آپلود و پردازش</button>
-        <div id="status-msg"></div>
+    <!-- Login/Register Overlay -->
+    <div id="auth-overlay" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center {% if user.is_authenticated %}hidden{% endif %}">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96 text-center">
+            <h2 id="auth-title" class="text-2xl font-bold mb-6">ورود به سیستم</h2>
+            
+            <input type="text" id="username" placeholder="نام کاربری" class="w-full p-3 mb-4 bg-gray-700 rounded text-white outline-none focus:ring-2 ring-blue-500">
+            <input type="password" id="password" placeholder="رمز عبور" class="w-full p-3 mb-4 bg-gray-700 rounded text-white outline-none focus:ring-2 ring-blue-500">
+            <input type="password" id="confirm-password" placeholder="تکرار رمز عبور" class="w-full p-3 mb-4 bg-gray-700 rounded text-white outline-none focus:ring-2 ring-blue-500 hidden">
+            
+            <button onclick="handleAuth()" id="auth-btn" class="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded font-bold transition">ورود</button>
+            
+            <p class="mt-4 text-sm text-gray-400 cursor-pointer hover:text-white" onclick="toggleAuthMode()">
+                <span id="auth-switch-text">حساب کاربری ندارید؟ ثبت نام کنید</span>
+            </p>
+        </div>
     </div>
 
-    <!-- بخش جستجو -->
-    <div class="card">
-        <h2>🔍 ۲. جستجو در دانش</h2>
-        <input type="text" id="queryInput" placeholder="سوال خود را بپرسید...">
-        <button class="secondary" onclick="search()">جستجو</button>
-        <div id="results"></div>
+    <!-- App Container -->
+    <div class="flex w-full h-full {% if not user.is_authenticated %}filter blur-sm{% endif %}" id="app-container">
+        
+        <!-- Sidebar -->
+        <div class="sidebar w-64 flex-shrink-0 flex flex-col border-l border-gray-700 hidden md:flex">
+            <div class="p-3">
+                <button onclick="createNewChat()" class="w-full border border-gray-600 rounded p-3 text-right text-sm hover:bg-gray-800 transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> چت جدید
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-2" id="chat-list">
+                <!-- Chat History Items -->
+            </div>
+            <div class="p-4 border-t border-gray-700 text-sm flex justify-between items-center">
+                <span>{{ user.username }}</span>
+                <a href="/logout" class="text-red-400 hover:text-red-300"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+        </div>
+
+        <!-- Main Chat -->
+        <div class="flex-1 flex flex-col relative chat-area">
+            <!-- Mobile Header -->
+            <div class="md:hidden p-4 bg-gray-800 border-b border-gray-700 flex justify-between">
+                <button onclick="createNewChat()"><i class="fas fa-plus"></i></button>
+                <span class="font-bold">Gemini Chat</span>
+                <a href="/logout"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+
+            <!-- Messages Area -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-4 pb-32">
+                <!-- Welcome Message -->
+                <div class="text-center mt-20 text-gray-400" id="welcome-msg">
+                    <h1 class="text-4xl font-bold mb-4">Gemini 2.5 Flash</h1>
+                    <p>سوال خود را بپرسید...</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="absolute bottom-0 w-full p-4 bg-gradient-to-t from-gray-800 to-transparent">
+                <div class="max-w-3xl mx-auto input-area rounded-xl p-2 flex flex-col gap-2">
+                    <div class="flex items-center gap-2 px-2">
+                        <!-- Web Search Toggle -->
+                        <button id="web-search-toggle" onclick="toggleWebSearch()" class="text-gray-500 hover:text-white transition tooltip" title="جستجوی وب">
+                            <i class="fas fa-globe text-lg"></i>
+                        </button>
+                        <span id="web-search-status" class="text-xs text-gray-500">وب: خاموش</span>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <textarea id="prompt-input" rows="1" class="w-full bg-transparent border-0 text-white focus:ring-0 resize-none max-h-40 p-2" placeholder="پیامی بنویسید..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                        <button onclick="sendMessage()" class="p-2 rounded-md bg-transparent hover:bg-gray-700 text-gray-400 hover:text-white transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center text-xs text-gray-500 mt-2">Free Research Preview. Gemini may produce inaccurate information.</div>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function uploadFile() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("لطفا فایل انتخاب کنید");
+        let isLoginMode = true;
+        let currentChatId = null;
+        let isWebSearchOn = false;
 
-            const formData = new FormData();
-            formData.append('file', file);
+        // --- Auth Logic ---
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('auth-title').innerText = isLoginMode ? 'ورود به سیستم' : 'ثبت نام';
+            document.getElementById('auth-btn').innerText = isLoginMode ? 'ورود' : 'ثبت نام';
+            document.getElementById('auth-switch-text').innerText = isLoginMode ? 'حساب کاربری ندارید؟ ثبت نام کنید' : 'حساب دارید؟ وارد شوید';
+            document.getElementById('confirm-password').classList.toggle('hidden');
+        }
+
+        async function handleAuth() {
+            const username = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const confirmPass = document.getElementById('confirm-password').value;
             
-            document.getElementById('status-msg').innerText = "⏳ در حال آپلود و ساخت وکتور...";
-            
-            try {
-                // نکته مهم: اینجا به آدرس جدید درخواست میفرستد
-                const res = await fetch('/upload_and_process', { method: 'POST', body: formData });
-                if (res.status === 404) {
-                     alert("خطای 404: آدرس پیدا نشد. لطفا مطمئن شوید کد پایتون جدید دیپلوی شده است.");
-                     return;
-                }
-                const data = await res.json();
-                if (data.error) alert(data.error);
-                else document.getElementById('status-msg').innerText = "✅ " + data.message;
-            } catch (e) { 
-                console.error(e);
-                alert("خطا در ارتباط با سرور"); 
+            const endpoint = isLoginMode ? '/login' : '/register';
+            const body = isLoginMode ? {username, password: pass} : {username, password: pass, confirm_password: confirmPass};
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                location.reload(); // Reload to get authenticated page
+            } else {
+                alert(data.message);
             }
         }
 
-        async function search() {
-            const query = document.getElementById('queryInput').value;
-            if (!query) return alert("سوال را وارد کنید");
+        // --- Chat Logic ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            if (document.getElementById('auth-overlay').classList.contains('hidden')) {
+                loadChatList();
+            }
+        });
+
+        function toggleWebSearch() {
+            isWebSearchOn = !isWebSearchOn;
+            const btn = document.getElementById('web-search-toggle');
+            const status = document.getElementById('web-search-status');
             
-            document.getElementById('results').innerHTML = "⏳ در حال جستجو...";
+            if (isWebSearchOn) {
+                btn.classList.remove('text-gray-500');
+                btn.classList.add('text-blue-400');
+                status.innerText = "وب: روشن";
+                status.classList.add('text-blue-400');
+            } else {
+                btn.classList.add('text-gray-500');
+                btn.classList.remove('text-blue-400');
+                status.innerText = "وب: خاموش";
+                status.classList.remove('text-blue-400');
+            }
+        }
+
+        async function loadChatList() {
+            const res = await fetch('/api/chats');
+            const chats = await res.json();
+            const list = document.getElementById('chat-list');
+            list.innerHTML = '';
+            chats.forEach(chat => {
+                const item = document.createElement('div');
+                item.className = 'p-3 rounded hover:bg-gray-800 cursor-pointer text-sm truncate mb-1';
+                item.innerText = chat.title;
+                item.onclick = () => loadChat(chat.id);
+                list.appendChild(item);
+            });
+        }
+
+        async function createNewChat() {
+            const res = await fetch('/api/chats', {method: 'POST'});
+            const data = await res.json();
+            currentChatId = data.id;
+            loadChatList();
+            document.getElementById('messages-container').innerHTML = ''; // Clear UI
+            document.getElementById('welcome-msg').style.display = 'block';
+        }
+
+        async function loadChat(id) {
+            currentChatId = id;
+            document.getElementById('welcome-msg').style.display = 'none';
+            const res = await fetch(`/api/chats/${id}`);
+            const data = await res.json();
+            
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+            
+            data.messages.forEach(msg => {
+                appendMessage(msg.role, msg.content);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function appendMessage(role, content) {
+            const container = document.getElementById('messages-container');
+            document.getElementById('welcome-msg').style.display = 'none';
+            
+            const div = document.createElement('div');
+            div.className = `w-full p-4 border-b border-black/10 ${role === 'user' ? 'msg-user' : 'msg-ai'}`;
+            
+            const inner = document.createElement('div');
+            inner.className = 'max-w-3xl mx-auto flex gap-4';
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-sm flex items-center justify-center flex-shrink-0 ${role === 'user' ? 'bg-purple-500' : 'bg-green-500'}`;
+            avatar.innerHTML = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+            
+            const text = document.createElement('div');
+            text.className = 'prose prose-invert min-w-0 flex-1';
+            text.innerHTML = role === 'model' ? marked.parse(content) : content.replace(/\n/g, '<br>');
+            
+            inner.appendChild(avatar);
+            inner.appendChild(text);
+            div.appendChild(inner);
+            container.appendChild(div);
+            
+            container.scrollTop = container.scrollHeight;
+            return text; // Return text element for streaming effect if needed later
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('prompt-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            if (!currentChatId) {
+                await createNewChat();
+            }
+
+            input.value = '';
+            input.style.height = '';
+            appendMessage('user', message);
+
+            // Loading indicator placeholder
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.className = 'w-full p-4 msg-ai';
+            loadingDiv.innerHTML = '<div class="max-w-3xl mx-auto flex gap-4"><div class="w-8 h-8 bg-green-500 rounded-sm flex items-center justify-center"><i class="fas fa-robot"></i></div><div class="loader block"></div></div>';
+            document.getElementById('messages-container').appendChild(loadingDiv);
 
             try {
-                // نکته مهم: اینجا به آدرس جدید جستجو درخواست میفرستد
-                const res = await fetch('/search', { 
-                    method: 'POST', 
+                const res = await fetch('/api/send_message', {
+                    method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ query: query }) 
+                    body: JSON.stringify({
+                        chat_id: currentChatId,
+                        message: message,
+                        web_search: isWebSearchOn
+                    })
                 });
+                
                 const data = await res.json();
+                document.getElementById('loading-indicator').remove();
                 
-                const container = document.getElementById('results');
-                container.innerHTML = "";
-                
-                if (!data.results || data.results.length === 0) {
-                    container.innerHTML = "<p>موردی یافت نشد.</p>";
-                    return;
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    appendMessage('model', data.response);
+                    loadChatList(); // Update titles in sidebar
                 }
-
-                data.results.forEach(item => {
-                    container.innerHTML += `
-                        <div class="result-item">
-                            <span class="score">امتیاز: ${item.score ? item.score.toFixed(4) : 'N/A'}</span>
-                            <p>${item.text}</p>
-                            <small style="color:#888">منبع: ${item.source_file}</small>
-                        </div>
-                    `;
-                });
-
-            } catch (e) { 
-                console.error(e);
-                alert("خطا در جستجو"); 
+            } catch (e) {
+                document.getElementById('loading-indicator').remove();
+                alert("Error sending message");
             }
         }
+        
+        // Enter key sends message (Shift+Enter for new line)
+        document.getElementById('prompt-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
     </script>
-
 </body>
 </html>
