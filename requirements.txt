@@ -2,5 +2,6 @@ Flask
 Flask-SQLAlchemy
 Flask-Login
 google-generativeai
-gunicorn
 werkzeug
+gunicorn
+psycopg2-binary
