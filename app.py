@@ -38,7 +38,7 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
+    password = db.Column(db.Text, nullable=False)
     chats = db.relationship('Chat', backref='owner', lazy=True)
 
 class Chat(db.Model):
@@ -183,3 +183,4 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
