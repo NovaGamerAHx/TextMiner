@@ -21,12 +21,12 @@
 
     <!-- Login Modal -->
     <div id="auth-overlay" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center {% if user.is_authenticated %}hidden{% endif %}">
-        <div class="bg-gray-800 p-8 rounded-lg w-96 text-center">
+        <div class="bg-gray-800 p-8 rounded-lg w-96 text-center shadow-xl border border-gray-700">
             <h2 id="auth-title" class="text-2xl font-bold mb-6">ورود</h2>
-            <input type="text" id="username" placeholder="نام کاربری" class="w-full p-3 mb-4 bg-gray-700 rounded text-white text-right">
-            <input type="password" id="password" placeholder="رمز عبور" class="w-full p-3 mb-4 bg-gray-700 rounded text-white text-right">
-            <button onclick="handleAuth()" class="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded font-bold">تایید</button>
-            <p class="mt-4 text-sm text-gray-400 cursor-pointer" onclick="toggleAuthMode()">تغییر به ثبت نام / ورود</p>
+            <input type="text" id="username" placeholder="نام کاربری" class="w-full p-3 mb-4 bg-gray-700 rounded text-white text-right outline-none focus:border-blue-500 border border-transparent transition">
+            <input type="password" id="password" placeholder="رمز عبور" class="w-full p-3 mb-4 bg-gray-700 rounded text-white text-right outline-none focus:border-blue-500 border border-transparent transition">
+            <button onclick="handleAuth()" class="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded font-bold transition">تایید</button>
+            <p class="mt-4 text-sm text-gray-400 cursor-pointer hover:text-white" onclick="toggleAuthMode()">تغییر به ثبت نام / ورود</p>
         </div>
     </div>
 
@@ -34,114 +34,162 @@
     <div class="flex w-full h-full" id="app-container">
         <!-- Sidebar -->
         <div class="sidebar w-64 flex-shrink-0 flex flex-col border-l border-gray-700 hidden md:flex">
-            <div class="p-3"><button onclick="createNewChat()" class="w-full border border-gray-600 rounded p-3 text-right hover:bg-gray-800">چت جدید +</button></div>
+            <div class="p-3">
+                <button onclick="createNewChat()" class="w-full border border-gray-600 rounded p-3 text-right hover:bg-gray-800 transition flex justify-between items-center">
+                    <span>چت جدید</span>
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
             <div class="flex-1 overflow-y-auto px-2" id="chat-list"></div>
-            <div class="p-4 border-t border-gray-700 text-sm flex justify-between">
-                <span>{{ user.username }}</span>
-                <a href="/logout" class="text-red-400">خروج</a>
+            <div class="p-4 border-t border-gray-700 text-sm flex justify-between items-center">
+                <span class="truncate pl-2">{{ user.username }}</span>
+                <a href="/logout" class="text-red-400 hover:text-red-300" title="خروج"><i class="fas fa-sign-out-alt"></i></a>
             </div>
         </div>
 
         <!-- Chat Area -->
         <div class="flex-1 flex flex-col relative bg-gray-800">
+            <!-- Messages Box -->
             <div id="messages-container" class="flex-1 overflow-y-auto p-4 pb-32">
+                <!-- Welcome Message (Initial State) -->
                 <div class="text-center mt-20 text-gray-400" id="welcome-msg">
-                    <h1 class="text-4xl font-bold mb-4">Gemini 2.5</h1>
-                    <p>سوال بپرسید...</p>
+                    <h1 class="text-4xl font-bold mb-4">Gemini Chat</h1>
+                    <p>چیزی بپرسید تا شروع کنیم...</p>
                 </div>
             </div>
             
-            <div class="absolute bottom-0 w-full p-4 bg-gradient-to-t from-gray-900 to-transparent">
-                <div class="max-w-3xl mx-auto bg-gray-700 rounded-xl p-2 flex flex-col gap-2">
+            <!-- Input Area -->
+            <div class="absolute bottom-0 w-full p-4 bg-gradient-to-t from-gray-900 via-gray-900 to-transparent">
+                <div class="max-w-3xl mx-auto bg-gray-700 rounded-xl p-2 flex flex-col gap-2 shadow-lg border border-gray-600">
                     <div class="flex items-center gap-2 px-2">
-                        <button id="web-search-toggle" onclick="toggleWeb()" class="text-gray-500"><i class="fas fa-globe"></i></button>
-                        <span id="web-status" class="text-xs text-gray-500">وب: خاموش</span>
+                        <button id="web-search-toggle" onclick="toggleWeb()" class="text-gray-400 hover:text-white transition tooltip" title="جستجوی وب">
+                            <i class="fas fa-globe"></i>
+                        </button>
+                        <span id="web-status" class="text-xs text-gray-400">وب: خاموش</span>
                     </div>
                     <div class="flex items-end gap-2">
-                        <textarea id="prompt-input" rows="1" class="w-full bg-transparent border-0 text-white resize-none p-2 text-right" placeholder="پیام..."></textarea>
-                        <button onclick="sendMessage()" class="p-2 text-gray-400 hover:text-white"><i class="fas fa-paper-plane"></i></button>
+                        <textarea id="prompt-input" rows="1" class="w-full bg-transparent border-0 text-white resize-none p-2 text-right focus:ring-0 max-h-40" placeholder="پیامی بنویسید..." oninput="this.style.height='';this.style.height=this.scrollHeight+'px'"></textarea>
+                        <button onclick="sendMessage()" class="p-2 text-gray-400 hover:text-white transition bg-gray-600/50 rounded-lg hover:bg-gray-600"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
+                <div class="text-center text-xs text-gray-500 mt-2">Gemini may display inaccurate info.</div>
             </div>
         </div>
     </div>
 
     <script>
+        // جلوگیری از ارورهای کنسول مربوط به TailwindCDN
+        console.warn = function() {}; 
+
         let isRegister = false;
         let currentChatId = null;
         let webSearch = false;
 
-        function toggleAuthMode() { isRegister = !isRegister; document.getElementById('auth-title').innerText = isRegister ? "ثبت نام" : "ورود"; }
+        function toggleAuthMode() { 
+            isRegister = !isRegister; 
+            document.getElementById('auth-title').innerText = isRegister ? "ثبت نام" : "ورود"; 
+        }
         
         async function handleAuth() {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
-            const res = await fetch(isRegister ? '/register' : '/login', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: u, password: p, confirm_password: p})
-            });
-            const data = await res.json();
-            if (data.success) location.reload();
-            else alert(data.message);
+            if(!u || !p) return alert("لطفا نام کاربری و رمز را وارد کنید");
+
+            try {
+                const res = await fetch(isRegister ? '/register' : '/login', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p, confirm_password: p})
+                });
+                const data = await res.json();
+                if (data.success) location.reload();
+                else alert(data.message);
+            } catch(e) { alert("خطا در ارتباط با سرور"); }
         }
 
         function toggleWeb() {
             webSearch = !webSearch;
             const btn = document.getElementById('web-search-toggle');
             const txt = document.getElementById('web-status');
-            if(webSearch) { btn.classList.add('text-blue-400'); txt.innerText = "وب: روشن"; txt.classList.add('text-blue-400'); }
-            else { btn.classList.remove('text-blue-400'); txt.innerText = "وب: خاموش"; txt.classList.remove('text-blue-400'); }
+            if(webSearch) { 
+                btn.classList.add('text-blue-400'); btn.classList.remove('text-gray-400');
+                txt.innerText = "وب: روشن"; txt.classList.add('text-blue-400'); txt.classList.remove('text-gray-400');
+            } else { 
+                btn.classList.remove('text-blue-400'); btn.classList.add('text-gray-400');
+                txt.innerText = "وب: خاموش"; txt.classList.remove('text-blue-400'); txt.classList.add('text-gray-400');
+            }
+        }
+
+        // --- توابع مدیریت چت ---
+
+        // تابع کمکی برای ریست کردن صفحه
+        function resetChatView() {
+            const container = document.getElementById('messages-container');
+            // به جای خالی کردن و ارور خوردن، محتوای پیش فرض را می‌سازیم
+            container.innerHTML = `
+                <div class="text-center mt-20 text-gray-400" id="welcome-msg">
+                    <h1 class="text-4xl font-bold mb-4">Gemini Chat</h1>
+                    <p>چیزی بپرسید تا شروع کنیم...</p>
+                </div>`;
         }
 
         async function createNewChat() {
-            console.log("Creating new chat...");
-            const res = await fetch('/api/chats', {method: 'POST'});
-            const data = await res.json();
-            currentChatId = data.id;
-            console.log("New Chat ID:", currentChatId);
-            loadChatList();
-            document.getElementById('messages-container').innerHTML = '';
-            document.getElementById('welcome-msg').style.display = 'block';
+            try {
+                const res = await fetch('/api/chats', {method: 'POST'});
+                const data = await res.json();
+                currentChatId = data.id;
+                loadChatList();
+                resetChatView(); // استفاده از تابع ایمن
+            } catch(e) { console.error(e); }
         }
 
         async function loadChatList() {
-            const res = await fetch('/api/chats');
-            const chats = await res.json();
-            const list = document.getElementById('chat-list');
-            list.innerHTML = '';
-            chats.forEach(c => {
-                const d = document.createElement('div');
-                d.className = 'p-3 rounded hover:bg-gray-700 cursor-pointer mb-1 text-right truncate';
-                d.innerText = c.title;
-                d.onclick = () => loadChat(c.id);
-                list.appendChild(d);
-            });
+            try {
+                const res = await fetch('/api/chats');
+                const chats = await res.json();
+                const list = document.getElementById('chat-list');
+                list.innerHTML = '';
+                chats.forEach(c => {
+                    const d = document.createElement('div');
+                    d.className = 'p-3 rounded hover:bg-gray-700 cursor-pointer mb-1 text-right truncate transition text-gray-300 hover:text-white';
+                    d.innerText = c.title;
+                    d.onclick = () => loadChat(c.id);
+                    list.appendChild(d);
+                });
+            } catch(e) { console.error(e); }
         }
 
         async function loadChat(id) {
-            console.log("Loading chat:", id);
             currentChatId = id;
-            document.getElementById('welcome-msg').style.display = 'none';
-            const res = await fetch(`/api/chats/${id}`);
-            const data = await res.json();
-            const box = document.getElementById('messages-container');
-            box.innerHTML = '';
-            data.messages.forEach(m => appendUI(m.role, m.content));
-            box.scrollTop = box.scrollHeight;
+            try {
+                const res = await fetch(`/api/chats/${id}`);
+                const data = await res.json();
+                const box = document.getElementById('messages-container');
+                box.innerHTML = ''; // اینجا می‌توانیم خالی کنیم چون بلافاصله پر می‌شود
+                data.messages.forEach(m => appendUI(m.role, m.content));
+                box.scrollTop = box.scrollHeight;
+            } catch(e) { console.error(e); }
         }
 
         function appendUI(role, content) {
-            document.getElementById('welcome-msg').style.display = 'none';
+            // چک می‌کنیم اگر ولکام مسیج هست، برش میداریم (ایمن)
+            const welcome = document.getElementById('welcome-msg');
+            if (welcome) welcome.remove();
+
             const box = document.getElementById('messages-container');
             const div = document.createElement('div');
-            div.className = `w-full p-4 border-b border-white/10 ${role === 'user' ? 'msg-user' : 'msg-ai'}`;
+            div.className = `w-full p-4 border-b border-white/5 ${role === 'user' ? 'msg-user' : 'msg-ai'}`;
+            
+            // آیکون‌ها و استایل
+            const icon = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+            const bgClass = role === 'user' ? 'bg-indigo-600' : 'bg-emerald-600';
+            
             div.innerHTML = `
                 <div class="max-w-3xl mx-auto flex gap-4 ${role==='user'?'flex-row-reverse':''}">
-                    <div class="w-8 h-8 rounded flex items-center justify-center shrink-0 ${role==='user'?'bg-purple-600':'bg-green-600'}">
-                        <i class="fas ${role==='user'?'fa-user':'fa-robot'}"></i>
+                    <div class="w-8 h-8 rounded flex items-center justify-center shrink-0 ${bgClass} shadow-lg">
+                        ${icon}
                     </div>
-                    <div class="prose prose-invert min-w-0 flex-1 text-right">
-                        ${role==='model' ? marked.parse(content) : content}
+                    <div class="prose prose-invert min-w-0 flex-1 text-right leading-relaxed">
+                        ${role==='model' ? marked.parse(content) : content.replace(/\n/g, '<br>')}
                     </div>
                 </div>`;
             box.appendChild(div);
@@ -154,21 +202,29 @@
             if(!msg) return;
 
             if(!currentChatId) {
-                console.log("No chat ID, creating one first...");
-                await createNewChat();
+                // اگر چت آیدی نداریم، اول می‌سازیم بعد پیام می‌فرستیم
+                try {
+                    const res = await fetch('/api/chats', {method: 'POST'});
+                    const data = await res.json();
+                    currentChatId = data.id;
+                    loadChatList();
+                    // نکته: اینجا دیگر resetChatView صدا نمی‌زنیم چون می‌خواهیم پیام کاربر اضافه شود
+                    const welcome = document.getElementById('welcome-msg');
+                    if (welcome) welcome.remove();
+                } catch(e) { alert("خطا در ایجاد چت"); return; }
             }
 
-            console.log(`Sending message to Chat ID: ${currentChatId}`);
             txt.value = '';
+            txt.style.height = ''; // ریست ارتفاع باکس
             appendUI('user', msg);
 
-            // Loading
+            // لودینگ
             const loadingId = 'loading-' + Date.now();
             const box = document.getElementById('messages-container');
             const lDiv = document.createElement('div');
             lDiv.id = loadingId;
-            lDiv.className = 'w-full p-4 msg-ai';
-            lDiv.innerHTML = '<div class="max-w-3xl mx-auto flex gap-4"><div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center"><i class="fas fa-robot"></i></div><span class="loader"></span></div>';
+            lDiv.className = 'w-full p-4 msg-ai border-b border-white/5';
+            lDiv.innerHTML = '<div class="max-w-3xl mx-auto flex gap-4"><div class="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center"><i class="fas fa-robot"></i></div><span class="loader mt-1"></span></div>';
             box.appendChild(lDiv);
             box.scrollTop = box.scrollHeight;
 
@@ -179,7 +235,6 @@
                     body: JSON.stringify({chat_id: currentChatId, message: msg, web_search: webSearch})
                 });
                 
-                // هندل کردن سشن اکسپایر شده
                 if (res.redirected) {
                     window.location.href = res.url;
                     return;
@@ -189,24 +244,34 @@
                 document.getElementById(loadingId).remove();
                 
                 if(data.error) {
-                    console.error("Backend Error:", data.error);
-                    alert("خطا: " + data.error);
+                    // نمایش خطا به صورت حباب پیام
+                    appendUI('model', `⚠️ **خطا:** ${data.error}`);
                 } else {
                     appendUI('model', data.response);
-                    loadChatList(); // آپدیت تایتل
+                    // آپدیت تایتل چت در سایدبار (اگر اولین پیام بوده)
+                    if (document.getElementById('chat-list').children.length > 0 && 
+                        document.getElementById('chat-list').firstChild.innerText === "چت جدید") {
+                        loadChatList();
+                    }
                 }
             } catch(e) {
-                document.getElementById(loadingId).remove();
-                console.error("Network Error:", e);
+                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
                 alert("خطا در ارتباط با سرور");
             }
         }
 
+        // ارسال با اینتر
         document.getElementById('prompt-input').addEventListener('keydown', e => {
-            if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+            if(e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                sendMessage(); 
+            }
         });
 
-        {% if user.is_authenticated %} loadChatList(); {% endif %}
+        // لود اولیه
+        {% if user.is_authenticated %} 
+            loadChatList(); 
+        {% endif %}
     </script>
 </body>
 </html>
